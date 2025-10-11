@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Matemáticas 4º-7º - 10 Niveles</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Matemáticas 4º - 7º 🎯</h1>
+    <p class="subtitle">10 niveles: desde operaciones con enteros hasta fracciones, porcentajes y álgebra básica.</p>
+
+    <div class="controls">
+      <label for="level">Selecciona un nivel:</label>
+      <select id="level"></select>
+      <button id="new">Nueva pregunta</button>
+    </div>
+
+    <div class="card">
+      <div id="question" class="question">Pulsa "Nueva pregunta" para empezar.</div>
+      <div class="answer-area">
+        <input id="answer" placeholder="Respuesta (usa decimales o fracciones e.g. 3/4)" />
+        <button id="check">Comprobar</button>
+        <button id="show">Mostrar respuesta</button>
+      </div>
+      <div id="feedback" class="feedback"></div>
+    </div>
+
+    <div class="footer">
+      <small>Diseñado para practicar y aprender. Reemplaza imágenes por contenido con licencia si es necesario.</small>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
