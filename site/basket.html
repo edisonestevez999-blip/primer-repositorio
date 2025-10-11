@@ -22,6 +22,7 @@
   <div class="wrap">
     <div class="game">
       <canvas id="c" width="800" height="500"></canvas>
+      <div style="color:#fff;margin-top:8px;text-align:center">Puntuación: <span id="score">0</span></div>
     </div>
     <div class="ui">
       <div class="player-box">
@@ -109,8 +110,10 @@
         }
       }
 
-      // Simple rim as target (top center)
-      // TODO: implement scoring and net collision
+      // Rim / hoop parameters (top center)
+      const rim = { x: W/2, y: 60, r: 38, thickness:6 };
+      let score = 0;
+      let lastBallAboveRim = false; // track crossing direction for correct scoring
     }
 
     // Drawing
@@ -133,8 +136,24 @@
       // charge indicator
       if(charging){ const dt = (performance.now()-chargeStart)/1000; const pct = Math.min(1, dt/1.2); ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(10,10,120,18); ctx.fillStyle='#0a84ff'; ctx.fillRect(10,10,120*pct,18); ctx.strokeStyle='#fff'; ctx.strokeRect(10,10,120,18) }
 
-      // simple rim
-      ctx.strokeStyle='#fff'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(W/2 - 40,60); ctx.lineTo(W/2 + 40,60); ctx.stroke();
+      // draw rim (as arc)
+      ctx.strokeStyle='#fffa'; ctx.lineWidth=rim.thickness; ctx.beginPath(); ctx.arc(rim.x, rim.y, rim.r-8, Math.PI, 2*Math.PI); ctx.stroke();
+      // backboard
+      ctx.fillStyle='#eee'; ctx.fillRect(rim.x + rim.r - 6, rim.y - 30, 6, 60);
+
+      // draw score area (invisible) - debug outline if needed
+      // ctx.strokeStyle='rgba(255,0,0,0.2)'; ctx.strokeRect(rim.x - 24, rim.y, 48, 80);
+
+      // scoring detection: if ball goes from above rim to below within hoop x-range
+      const inHoopX = ball.x > (rim.x - 24) && ball.x < (rim.x + 24);
+      const ballAboveRim = ball.y < rim.y - 6;
+      if(ballAboveRim) lastBallAboveRim = true;
+      if(lastBallAboveRim && !ballAboveRim && inHoopX && !ball.held){
+        // count score when crossing down through hoop area
+        score += 2; document.getElementById('score').textContent = score; lastBallAboveRim = false;
+        // small visual effect
+        flashScore();
+      }
     }
 
     let last = performance.now();
@@ -143,6 +162,14 @@
 
     // reset
     document.getElementById('reset').addEventListener('click', ()=>{ player.x=W/2; player.y=H-120; player.holding=true; ball.x=player.x+30; ball.y=player.y; ball.held=true; ball.vx=0; ball.vy=0 });
+
+    // score flash
+    function flashScore(){
+      const el = document.getElementById('score');
+      el.style.transition = 'transform 150ms ease';
+      el.style.transform = 'scale(1.4)';
+      setTimeout(()=>{ el.style.transform = 'scale(1)'; }, 160);
+    }
 
     // simple touch support omitted for brevity
   </script>
