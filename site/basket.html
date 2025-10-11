@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Basket Demo - Juego 2D</title>
+  <style>
+    :root{--bg:#2b2f33;--court:#d7a86e;--line:#fff}
+    html,body{height:100%;margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:#fff}
+    .wrap{display:flex;gap:16px;padding:18px}
+    .game{background:linear-gradient(#0b1620,#0f1b22);border-radius:10px;padding:12px}
+    canvas{background:linear-gradient(#2a6,#2a9);display:block;border-radius:6px}
+    .ui{width:300px}
+    .player-box{background:#111a;color:#fff;padding:12px;border-radius:8px}
+    .avatar{width:64px;height:64px;border-radius:50%;background:#888;display:inline-block;vertical-align:middle;margin-right:8px}
+    .controls{margin-top:8px}
+    .hint{opacity:.9;font-size:13px;margin-top:8px}
+    button{padding:8px 10px;border-radius:6px;border:none;background:#0a84ff;color:#fff;cursor:pointer}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="game">
+      <canvas id="c" width="800" height="500"></canvas>
+    </div>
+    <div class="ui">
+      <div class="player-box">
+        <div style="display:flex;align-items:center">
+          <div class="avatar" id="avatar"></div>
+          <div>
+            <div id="playerName">Jugador: Edison</div>
+            <div id="level">Demo: 1 vs 0</div>
+          </div>
+        </div>
+        <div class="controls">
+          <div><strong>Controles</strong></div>
+          <div>W adelante, S atrás, A izquierda, D derecha</div>
+          <div>Click izquierdo: tirar (mantener para cargar)</div>
+        </div>
+        <div class="hint">Nota: rostros y nombres son placeholders.</div>
+        <div style="margin-top:8px">
+          <button id="reset">Reiniciar posición</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Juego 2D top-down simple con físicas básicas
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    // Estado del jugador y balón
+    const player = { x: W/2, y: H - 120, r: 18, speed: 2.6, vx:0, vy:0, holding:true };
+    const ball = { x: player.x+30, y: player.y, r:8, vx:0, vy:0, held:true };
+
+    // Tiro
+    let charging=false, chargeStart=0;
+
+    // Input
+    const keys = {};
+    window.addEventListener('keydown', e=>{ keys[e.key.toLowerCase()] = true });
+    window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()] = false });
+
+    // Mouse for shoot
+    let mouse = {x:0,y:0,down:false};
+    canvas.addEventListener('mousemove', e=>{ const rect = canvas.getBoundingClientRect(); mouse.x = e.clientX - rect.left; mouse.y = e.clientY - rect.top });
+    canvas.addEventListener('mousedown', e=>{ if(e.button===0){ mouse.down=true; startCharge() } });
+    canvas.addEventListener('mouseup', e=>{ if(e.button===0){ mouse.down=false; releaseShoot() } });
+
+    function startCharge(){ if(ball.held){ charging=true; chargeStart=performance.now() } }
+    function releaseShoot(){ if(ball.held && charging){ const dt = (performance.now()-chargeStart)/1000; const power = Math.min(1, dt/1.2); shoot(power); charging=false } }
+
+    function shoot(power){ // apply velocity to ball towards mouse
+      const dx = mouse.x - ball.x; const dy = mouse.y - ball.y; const mag = Math.hypot(dx,dy)||1; const force = 7 + 18*power; ball.vx = (dx/mag)*force; ball.vy = (dy/mag)*force - 2; ball.held=false; player.holding=false; ball.x += ball.vx*0.5; ball.y += ball.vy*0.5 }
+
+    // Física básica
+    function step(dt){
+      // Player movement
+      let mx=0,my=0; if(keys['w']) my-=1; if(keys['s']) my+=1; if(keys['a']) mx-=1; if(keys['d']) mx+=1;
+      if(mx||my){ const im = Math.hypot(mx,my); mx/=im; my/=im; player.x += mx*player.speed; player.y += my*player.speed }
+      // clamp player
+      player.x = Math.max(player.r, Math.min(W-player.r, player.x));
+      player.y = Math.max(player.r, Math.min(H-player.r, player.y));
+
+      // If player close to ball and ball not held, pick up
+      const distPB = Math.hypot(ball.x-player.x, ball.y-player.y);
+      if(distPB < player.r + 12 && !ball.held){ ball.held = true; player.holding=true; ball.vx=0; ball.vy=0 }
+
+      // Ball follow when held
+      if(ball.held){ // position ball slightly ahead of player based on last movement or mouse
+        const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+        const holdDist = player.r + ball.r + 4;
+        ball.x = player.x + Math.cos(angle)*holdDist;
+        ball.y = player.y + Math.sin(angle)*holdDist;
+      } else {
+        // apply velocity and friction
+        ball.vy += 0.18; // gravity-like downward (makes bounces feel)
+        ball.x += ball.vx; ball.y += ball.vy;
+        ball.vx *= 0.995; ball.vy *= 0.995;
+        // bounce with floor and walls
+        if(ball.x - ball.r < 0){ ball.x = ball.r; ball.vx *= -0.65 }
+        if(ball.x + ball.r > W){ ball.x = W-ball.r; ball.vx *= -0.65 }
+        if(ball.y - ball.r < 0){ ball.y = ball.r; ball.vy *= -0.65 }
+        if(ball.y + ball.r > H){ ball.y = H-ball.r; ball.vy *= -0.6; /* small energy loss */
+          // if very slow, come to rest
+          if(Math.abs(ball.vy) < 0.6) ball.vy = 0;
+        }
+      }
+
+      // Simple rim as target (top center)
+      // TODO: implement scoring and net collision
+    }
+
+    // Drawing
+    function draw(){
+      ctx.clearRect(0,0,W,H);
+      // court background
+      ctx.fillStyle = '#2b7'; ctx.fillRect(0,0,W,H);
+      // mid court line
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+
+      // draw player
+      ctx.fillStyle = '#103'; ctx.beginPath(); ctx.arc(player.x, player.y, player.r,0,Math.PI*2); ctx.fill();
+      // player name
+      ctx.fillStyle = '#fff'; ctx.font = '12px Arial'; ctx.fillText('Edison', player.x - 18, player.y - player.r - 10);
+
+      // draw ball
+      ctx.fillStyle = '#f59c1a'; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#a45100'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r-1,0,Math.PI*2); ctx.stroke();
+
+      // charge indicator
+      if(charging){ const dt = (performance.now()-chargeStart)/1000; const pct = Math.min(1, dt/1.2); ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(10,10,120,18); ctx.fillStyle='#0a84ff'; ctx.fillRect(10,10,120*pct,18); ctx.strokeStyle='#fff'; ctx.strokeRect(10,10,120,18) }
+
+      // simple rim
+      ctx.strokeStyle='#fff'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(W/2 - 40,60); ctx.lineTo(W/2 + 40,60); ctx.stroke();
+    }
+
+    let last = performance.now();
+    function loop(ts){ const now=ts||performance.now(); const dt=(now-last)/1000; step(dt); draw(); last=now; requestAnimationFrame(loop) }
+    requestAnimationFrame(loop);
+
+    // reset
+    document.getElementById('reset').addEventListener('click', ()=>{ player.x=W/2; player.y=H-120; player.holding=true; ball.x=player.x+30; ball.y=player.y; ball.held=true; ball.vx=0; ball.vy=0 });
+
+    // simple touch support omitted for brevity
+  </script>
+</body>
+</html>
