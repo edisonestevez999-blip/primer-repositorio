@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Matemáticas Básicas - 1ro a 3ro</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Matemáticas Básicas 🎒</h1>
+    <p class="subtitle">Niveles 1 - 10 para estudiantes de 1ro a 3ro de básica</p>
+
+    <div class="controls">
+      <label for="level">Selecciona un nivel:</label>
+      <select id="level"></select>
+      <button id="new">Nueva pregunta</button>
+    </div>
+
+    <div class="card">
+      <div id="question" class="question">Presiona "Nueva pregunta" para comenzar ✅</div>
+      <div class="answer-area">
+        <input id="answer" placeholder="Escribe tu respuesta aquí" />
+        <button id="check">Comprobar</button>
+        <button id="show">Mostrar respuesta</button>
+      </div>
+      <div id="feedback" class="feedback"></div>
+    </div>
+
+    <div class="footer">
+      <small>Hecho con ❤️ para estudiantes. Fácil, claro y divertido.</small>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
