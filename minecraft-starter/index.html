@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Minecraft-starter (single file)</title>
+    <style>
+      html,body{height:100%;margin:0}
+      canvas{display:block}
+      .overlay{
+        position:fixed;left:12px;top:12px;color:#fff;font-family:Inter,Segoe UI,Arial;background:rgba(0,0,0,0.35);padding:10px;border-radius:8px;backdrop-filter:blur(4px)
+      }
+      .hint{opacity:0.9;font-size:13px}
+    </style>
+  </head>
+  <body>
+    <div class="overlay">
+      <div style="font-weight:600;margin-bottom:6px">Minecraft-starter — básico</div>
+      <div class="hint">Click/arrastra bloques para moverlos. Presiona <b>R</b> para añadir un bloque frente a la cámara.</div>
+    </div>
+
+    <script type="module">
+    // Level: grid generator + interaction + simplified PBR-like materials
+    import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js';
+    import * as CANNON from 'https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js';
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x9fbcd4);
+
+    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 300);
+    camera.position.set(18, 24, 18);
+
+    const renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    window.addEventListener('resize', ()=>{ camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0,0,0);
+
+    // Lights
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x444455, 0.6); hemi.position.set(0,50,0); scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 1.0); dir.position.set(20,40,10); dir.castShadow = true;
+    dir.shadow.mapSize.set(2048,2048); dir.shadow.camera.left = -60; dir.shadow.camera.right = 60; dir.shadow.camera.top = 60; dir.shadow.camera.bottom = -60; scene.add(dir);
+
+    // small ambient via env-like color
+    const ambient = new THREE.AmbientLight(0xffffff, 0.15); scene.add(ambient);
+
+    // Physics
+    const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
+    world.broadphase = new CANNON.SAPBroadphase(world);
+    world.solver.iterations = 12; world.defaultContactMaterial.friction = 0.4;
+
+    // Ground plane (three + physics)
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x6b8b6b, roughness: 0.85, metalness: 0.05 });
+    const groundGeo = new THREE.BoxGeometry(80, 1, 80);
+    const groundMesh = new THREE.Mesh(groundGeo, groundMat); groundMesh.receiveShadow = true; groundMesh.position.y = -0.5; scene.add(groundMesh);
+    const groundBody = new CANNON.Body({ mass: 0 }); groundBody.addShape(new CANNON.Box(new CANNON.Vec3(40,0.5,40))); groundBody.position.set(0,-0.5,0); world.addBody(groundBody);
+
+    // Level generation parameters
+    const GRID = 32; // grid size (GRID x GRID)
+    const CELL = 1;  // block size
+    const HALF = Math.floor(GRID/2);
+
+    // simple height function (pseudo-noise)
+    function heightAt(i, j){
+      const nx = i / GRID - 0.5; const ny = j / GRID - 0.5;
+      const e = (Math.sin(nx * 5.1) + Math.cos(ny * 6.2)) * 0.5 + Math.sin((nx+ny)*3.2) * 0.25;
+      const h = Math.floor((e + 1.2) * 2); // 0..3
+      return Math.max(0, h);
+    }
+
+    // blocks store
+    const blocks = [];
+
+    function createBlockAt(i, j, k, color){
+      const x = (i - HALF) * CELL; const z = (j - HALF) * CELL; const y = k * CELL + CELL/2;
+      const geo = new THREE.BoxGeometry(CELL, CELL, CELL);
+      const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.05 });
+      const mesh = new THREE.Mesh(geo, mat); mesh.castShadow = true; mesh.receiveShadow = true; mesh.position.set(x, y, z); scene.add(mesh);
+
+      const shape = new CANNON.Box(new CANNON.Vec3(CELL/2, CELL/2, CELL/2));
+      const body = new CANNON.Body({ mass: 1 }); body.addShape(shape); body.position.set(x, y, z); world.addBody(body);
+
+      blocks.push({ i, j, k, mesh, body, color });
+    }
+
+    // generate terrain grid
+    for(let i=0;i<GRID;i++){
+      for(let j=0;j<GRID;j++){
+        const h = heightAt(i,j);
+        for(let k=0;k<h;k++){
+          const color = (k===h-1) ? 0x8B5A2B : 0x4d7a3d; // top soil / below dirt
+          createBlockAt(i,j,k,color);
+        }
+      }
+    }
+
+    // Interaction helpers
+    const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+    let hoveredCell = null; let grabbed = null; let currentColor = 0x8B5A2B; let showGrid = true;
+
+    // hover helper mesh
+    const hoverMat = new THREE.MeshStandardMaterial({ color: 0xffff00, transparent:true, opacity:0.25 });
+    const hoverGeo = new THREE.BoxGeometry(CELL, CELL, CELL);
+    const hoverMesh = new THREE.Mesh(hoverGeo, hoverMat); hoverMesh.visible = false; scene.add(hoverMesh);
+
+    function clientToMouse(e){ mouse.x = (e.clientX/innerWidth)*2 - 1; mouse.y = -(e.clientY/innerHeight)*2 +1; }
+
+    function getIntersectedBlock(){ raycaster.setFromCamera(mouse, camera); const intersects = raycaster.intersectObjects(blocks.map(b=>b.mesh)); return intersects.length ? intersects[0] : null; }
+
+    function onPointerMove(e){ clientToMouse(e); const hit = getIntersectedBlock(); if(hit){ const mesh = hit.object; const b = blocks.find(x=>x.mesh===mesh); if(b){ hoverMesh.visible = true; hoverMesh.position.copy(mesh.position); hoverMesh.position.y = mesh.position.y; hoveredCell = b; return; } }
+      // no block hit: hover on ground plane
+      // intersect plane y=0
+      raycaster.setFromCamera(mouse, camera);
+      const plane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+      const pos = new THREE.Vector3(); raycaster.ray.intersectPlane(plane, pos);
+      if(pos){ hoverMesh.visible = true; hoverMesh.position.set(Math.round(pos.x/CELL)*CELL, CELL/2, Math.round(pos.z/CELL)*CELL); hoveredCell = null; }
+    }
+
+    function onPointerDown(e){ clientToMouse(e); const hit = getIntersectedBlock(); if(hit){ const mesh = hit.object; grabbed = blocks.find(b=>b.mesh===mesh); if(grabbed){ grabbed.body.type = CANNON.Body.KINEMATIC; grabbed.body.updateMassProperties(); } }
+    }
+
+    function onPointerUp(){ if(grabbed){ grabbed.body.type = CANNON.Body.DYNAMIC; grabbed.body.updateMassProperties(); grabbed = null; } }
+
+    function placeBlockAtHovered(){ if(!hoverMesh.visible) return; const gx = Math.round(hoverMesh.position.x/CELL) * CELL; const gz = Math.round(hoverMesh.position.z/CELL) * CELL; // find top k at that grid
+      // compute grid indices
+      const i = Math.round(gx/CELL) + HALF; const j = Math.round(gz/CELL) + HALF;
+      // find highest k at i,j
+      let maxK = -1; blocks.forEach(b=>{ if(b.i===i && b.j===j) maxK = Math.max(maxK, b.k); });
+      const newK = maxK + 1; createBlockAt(i,j,newK,currentColor);
+    }
+
+    function deleteBlockUnderCursor(){ clientToMouse({clientX: (mouse.x+1)*0.5*innerWidth, clientY: (1-mouse.y)*0.5*innerHeight}); const hit = getIntersectedBlock(); if(hit){ const mesh = hit.object; const idx = blocks.findIndex(b=>b.mesh===mesh); if(idx>=0){ const b = blocks[idx]; // remove three
+          scene.remove(b.mesh); world.removeBody(b.body); blocks.splice(idx,1);
+        }
+      }
+    }
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointerup', onPointerUp);
+
+    // keyboard handlers
+    window.addEventListener('keydown', (e)=>{
+      if(e.key.toLowerCase() === 'r'){ placeBlockAtHovered(); }
+      if(e.key.toLowerCase() === 'x'){ deleteBlockUnderCursor(); }
+      if(e.key.toLowerCase() === 'g'){ showGrid = !showGrid; gridHelper.visible = showGrid; }
+    });
+
+    // grid helper
+    const gridHelper = new THREE.GridHelper(GRID*CELL, GRID, 0x222222, 0x444444); gridHelper.position.y = 0; scene.add(gridHelper);
+
+    // UI - simple inventory
+    const ui = document.createElement('div'); ui.style.position='fixed'; ui.style.right='12px'; ui.style.top='12px'; ui.style.background='rgba(0,0,0,0.35)'; ui.style.padding='8px'; ui.style.borderRadius='8px'; ui.style.color='#fff'; ui.style.fontFamily='Segoe UI,Arial'; document.body.appendChild(ui);
+    ui.innerHTML = '<div style="font-weight:600;margin-bottom:6px">Inventario</div>';
+    const colors = [0x8B5A2B,0x4d7a3d,0x9e9e9e,0xffffff,0xffcc00];
+    colors.forEach(c=>{ const b = document.createElement('button'); b.style.width='32px'; b.style.height='32px'; b.style.margin='4px'; b.style.border='2px solid rgba(255,255,255,0.12)'; b.style.background = '#'+c.toString(16).padStart(6,'0'); b.addEventListener('click', ()=>{ currentColor = c; }); ui.appendChild(b); });
+    const help = document.createElement('div'); help.style.marginTop='8px'; help.style.fontSize='12px'; help.innerHTML = 'R: colocar • X: eliminar • G: grid'; ui.appendChild(help);
+
+    // sync loop
+    const clock = new THREE.Clock();
+    function animate(){
+      requestAnimationFrame(animate);
+      const dt = Math.min(0.02, clock.getDelta());
+      world.step(1/60, dt);
+
+      blocks.forEach(b=>{ b.mesh.position.copy(b.body.position); b.mesh.quaternion.copy(b.body.quaternion); });
+      if(grabbed){ // keep kinematic grabbed at hover position
+        const target = hoverMesh.position.clone(); if(target) grabbed.body.position.set(target.x, target.y, target.z);
+      }
+
+      controls.update(); renderer.render(scene, camera);
+    }
+    animate();
+    </script>
+  </body>
+</html>

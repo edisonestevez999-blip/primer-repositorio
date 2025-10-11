@@ -1,0 +1,12 @@
+{
+  "name": "minecraft-starter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal Three.js + cannon-es starter with grid level and interactions",
+  "scripts": {
+    "start": "npx http-server -c-1 . -p 8000"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {}
+}
