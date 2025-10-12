@@ -12,3 +12,6 @@ Rama: main
   https://raw.githack.com/edisonestevez999-blip/primer-repositorio/main/math/4to-7mo/index.html
 
 > Nota: raw.githack sirve contenido estático directamente en el navegador usando el archivo raw de GitHub. Si planeas usar esto en producción, considera activar GitHub Pages o desplegar en un hosting estático.
+
+- Ajedrez (vista pública rápida):
+  https://raw.githack.com/edisonestevez999-blip/primer-repositorio/main/site/chess/index.html
