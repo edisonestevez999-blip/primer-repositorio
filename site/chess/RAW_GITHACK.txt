@@ -1,0 +1,2 @@
+Raw githack URL for playable chess demo
+https://raw.githack.com/edisonestevez999-blip/primer-repositorio/main/site/chess/index.html
