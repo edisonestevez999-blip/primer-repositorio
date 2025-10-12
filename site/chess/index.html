@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ajedrez - Bot 10 niveles</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="board-wrap">
+    <h1>Ajedrez vs Bot (10 niveles)</h1>
+    <div class="game">
+      <div id="board" class="board"></div>
+      <div class="panel">
+        <div>Turno: <span id="turn">Blancas</span></div>
+        <div>Nivel del bot: 
+          <select id="level">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+          </select>
+        </div>
+        <div><button id="new">Nueva partida</button></div>
+        <div id="status" class="status"></div>
+      </div>
+    </div>
+    <p class="note">Arrastra las piezas con clic izquierdo. El tablero es grande y con estilo madera clásica.</p>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
